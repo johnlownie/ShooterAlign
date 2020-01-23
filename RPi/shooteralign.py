@@ -23,6 +23,7 @@ def main():
     ap.add_argument("-l", "--height", type=int, default=480, help="the frame height")
     ap.add_argument("-s", "--stream", type=int, default=1, help="stream to the dashboard")
     ap.add_argument("-a", "--address", default="192.168.24.25", help="address of the roborio")
+    ap.add_argument("-n", "--num_frames", type=int, default=100, help="test frame rate with this number of frames")
     args = vars(ap.parse_args())
 
     # initialize some variables and frame holders
@@ -43,14 +44,16 @@ def main():
 
     # set up the camera
     vs = VideoStream(src=0).start()
+    fps = FPS().start()
 
     # setup the stream if required
     if args["stream"] > 0:
         camServer = CameraServer.getInstance()
-        framseStream = camServer.putVideo("Frame", width, height)
+        frameStream = camServer.putVideo("Frame", width, height)
         maskStream = camServer.putVideo("Mask", width, height)
 
-    while True:
+    # while True:
+    while fps._numFrames < args["num_frames"]:
         frame = vs.read()
 
         # get the bounds values from the dashboard
@@ -64,7 +67,7 @@ def main():
 
         # resize, blur, and convert to hsv space 
         frame = imutils.resize(frame, width=width, height=height)
-        blurred = cv2.GaussianBlur(fram, (11, 11), 0)
+        blurred = cv2.GaussianBlur(frame, (5, 5), 0)
         hsv = cv2.cvtColor(blurred, cv2.COLOR_BGR2HSV)
 
         # create a mask, dilate and erode it
@@ -84,9 +87,16 @@ def main():
             frameStream.putFrame(frame)
             maskStream.putFrame(mask)
 
+        # update the frame counter
+        fps.update()
+
     # stop the camera, network, and fps counter
     vs.stop()
     NetworkTables.shutdown()
+    fps.stop()
+
+    # display the FPS results
+    print("[INFO] elapsed time: {:.2f} - approx FPS: {:.2f}".format(fps.elapsed(), fps.fps()))
 
 if __name__ == "__main__":
     main()
